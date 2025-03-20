@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: p5ci
+  namespace: default
+spec:
+  params:
+    - name: repo-url
+      type: string
+    - name: image-reference
+      type: string
+  workspaces:
+    - name: shared-data
+    - name: git-credentials
+    - name: docker-credentials
+  tasks:
+    - name: fetch-source
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+        - name: ssh-directory
+          workspace: git-credentials
+      params:
+        - name: url
+          value: $(params.repo-url)
+    - name: build-push-llm
+      runAfter: ["fetch-source"]
+      taskRef:
+        name: kaniko
+      workspaces:
+        - name: source
+          workspace: shared-data
+        - name: dockerconfig
+          workspace: docker-credentials
+      params:
+        - name: IMAGE
+          value: $(params.image-reference)/llm:$(tasks.fetch-source.results.committer-date)-$(tasks.fetch-source.results.commit)
+        - name: DOCKERFILE
+          value: ./Dockerfile
+        - name: CONTEXT
+          value: .
